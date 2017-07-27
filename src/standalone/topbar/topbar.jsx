@@ -15,7 +15,7 @@ export default class Topbar extends React.Component {
   constructor(props, context) {
     super(props, context)
 
-    Swagger("https://generator.swagger.io/api/swagger.json", {
+    Swagger("/api/swagger.json", {
       requestInterceptor: (req) => {
         req.headers["Accept"] = "application/json"
         req.headers["content-type"] = "application/json"
