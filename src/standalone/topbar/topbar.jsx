@@ -57,8 +57,7 @@ export default class Topbar extends React.Component {
   }
 
   importFromFile = () => {
-    let [fileToLoad] = this.refs.fileLoadInput.files
-
+    let fileToLoad = this.refs.fileLoadInput.files.item(0)
     let fileReader = new FileReader()
 
     fileReader.onload = fileLoadedEvent => {
@@ -111,7 +110,7 @@ export default class Topbar extends React.Component {
       swaggerClient.apis.servers.generateServerForLanguage({
         framework : name,
         body: JSON.stringify({
-          spec: specSelectors.specResolved()
+          spec: specSelectors.specJson()
         }),
         headers: JSON.stringify({
           Accept: "application/json"
@@ -124,7 +123,7 @@ export default class Topbar extends React.Component {
       swaggerClient.apis.clients.generateClient({
         language : name,
         body: JSON.stringify({
-          spec: specSelectors.specResolved()
+          spec: specSelectors.specJson()
         })
       })
         .then(res => handleResponse(res))
