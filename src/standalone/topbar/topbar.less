@@ -1,4 +1,8 @@
 #swagger-editor {
+  *:focus {
+    outline: 0;
+  }
+
   .topbar {
     background-color: #89bf04;
     width: 100%;
@@ -75,22 +79,18 @@
     }
   }
 
-  .modal {
-    padding: 1em;
-    position: relative;
-    min-height: 12em;
+  div.topbar-popup-button-area {
+    margin: 2em 0 0 0;
+    text-align: center;
+    padding: 10px 20px;
+  }
 
-    div.container {
-      height: 100%;
-    }
+  .topbar-specmgr-info {
+    margin-left: auto;
+    font-size: 1.2em;
 
-    .right {
-      margin: 1em;
-      text-align: right;
-    }
-
-    button {
-      margin-left: 1em;
+    .item {
+      margin: 0 0 0 1em;
     }
   }
 }

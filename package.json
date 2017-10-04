@@ -54,6 +54,7 @@
     "react-dd-menu": "^2.0.0",
     "react-dom": "^15.x",
     "react-file-download": "^0.3.2",
+    "react-notification-system": "^0.2.15",
     "react-redux": "^4.x.x",
     "react-transition-group": "^1.1.1",
     "redux": "^3.x.x",
