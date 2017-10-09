@@ -16,7 +16,8 @@ export default class Topbar extends React.Component {
   constructor(props, context) {
     super(props, context)
 
-    Swagger("/api/swagger.json", {
+    let url = "http://" + window.location.host
+    Swagger(url + "/api/swagger.json", {
       requestInterceptor: (req) => {
         req.headers["Accept"] = "application/json"
         req.headers["content-type"] = "application/json"
@@ -369,9 +370,7 @@ export default class Topbar extends React.Component {
     let { getComponent, specSelectors: { isOAS3 } } = this.props
     const Link = getComponent("Link")
 
-// TODO swagger-generatorがOAS3対応されるまで、強制的に表示
-//    let showGenerateMenu = !(isOAS3 && isOAS3())
-    let showGenerateMenu = true
+    let showGenerateMenu = !(isOAS3 && isOAS3())
 
     let makeMenuOptions = (name) => {
       let stateKey = `is${name}MenuOpen`
