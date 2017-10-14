@@ -23,7 +23,10 @@ export default class SpecMgrMenu extends React.Component {
       selectedBranchSource: null,
       selectedBranchTarget: null,
       selectedGitObject: null,
-      targetBranch: null
+      selectedTag: null,
+
+      targetBranch: null,
+      targetTag: null
     }
 
     this.handleChange = this.handleChange.bind(this)
@@ -300,6 +303,136 @@ export default class SpecMgrMenu extends React.Component {
 
 
   //------------------------------------------------------------------------------------------------
+  // add tag
+  //------------------------------------------------------------------------------------------------
+  showAddTagModal = () => {
+    this.syncGitObjects()
+    this.state.selectedGitObject = null
+    this.state.targetTag= null
+    this.refs.addTagModal.show()
+  }
+  hideAddTagModal = () => { this.refs.addTagModal.hide() }
+
+  addTag = () => {
+    let from = this.state.selectedGitObject
+    if (!from) {
+      this.noticeError("From GitObject is Empty")
+      return
+    }
+    let to = this.state.targetTag
+    if (!to) {
+      this.noticeError("Tag Name is Empty")
+      return
+    }
+
+    let errorTitle = "failed to create Tag"
+    let url = this.state.curSpecMgr + "/tags/" + to + "?object=" + from
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+    }).then(res => {
+      res.text().then(text => {
+        if (!res.ok) {
+          this.handleSpecMgrError(errorTitle, to, text)
+          return
+        }
+        this.noticeSuccess(to + " Tag has been created.")
+      })
+    })
+    .catch(error => this.noticeError(errorTitle, error))
+
+    this.hideAddTagModal()
+  }
+
+  //------------------------------------------------------------------------------------------------
+  // rename tag
+  //------------------------------------------------------------------------------------------------
+  showRenameTagModal = () => {
+    this.syncTaglist()
+    this.state.selectedTag = null
+    this.state.targetTag = null
+    this.refs.renameTagModal.show()
+  }
+  hideRenameTagModal = () => { this.refs.renameTagModal.hide() }
+
+  renameTag = () => {
+    let from = this.state.selectedTag
+    if (!from) {
+      this.noticeError("From Tag is not selected")
+      return
+    }
+    let to = this.state.targetTag
+    if (!to) {
+      this.noticeError("Tag Name is Empty")
+      return
+    }
+
+    let errorTitle = "failed to rename Tag"
+    let url = this.state.curSpecMgr + "/tags/" + from + "?to=" + to
+    fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+    }).then(res => {
+      res.text().then(text => {
+        if (!res.ok) {
+          this.handleSpecMgrError(errorTitle, to, text)
+          return
+        }
+        this.noticeSuccess(to + " Tag has been renamed.")
+      })
+    })
+    .catch(error => this.noticeError(errorTitle, error))
+
+    this.hideRenameTagModal()
+  }
+
+  //------------------------------------------------------------------------------------------------
+  // delete tag
+  //------------------------------------------------------------------------------------------------
+  showDeleteTagModal = () => {
+    this.syncTaglist()
+    this.state.selectedTag = null
+    this.refs.deleteTagModal.show()
+  }
+  hideDeleteTagModal = () => { this.refs.deleteTagModal.hide() }
+
+  deleteTag = () => {
+    let targetTag = this.state.selectedTag
+    if(!targetTag) {
+      this.noticeError("Tag is not selected")
+      return
+    }
+
+    let errorTitle = "failed to delete Tag"
+    let url = this.state.curSpecMgr + "/tags/" + targetTag
+    fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+    }).then(res => {
+      res.text().then(text => {
+        if (!res.ok) {
+          this.handleSpecMgrError(errorTitle, targetTag, text)
+          return
+        }
+        this.noticeSuccess(targetTag + " Tag has been deleted.")
+      })
+    })
+    .catch(error => this.noticeError(errorTitle, error))
+
+    this.hideDeleteTagModal()
+  }
+
+
+  //------------------------------------------------------------------------------------------------
   // notification
   //------------------------------------------------------------------------------------------------
   handleSpecMgrError = (errorTitle, specId, text) => {
@@ -358,7 +491,14 @@ export default class SpecMgrMenu extends React.Component {
           <li><button type="button" onClick={this.showMergeModal}>Merge</button></li>
         </DropdownMenu>
 
+        <DropdownMenu className="item" {...makeMenuOptions("Tag")}>
+          <li><button type="button" onClick={this.showAddTagModal}>Add</button></li>
+          <li><button type="button" onClick={this.showRenameTagModal}>Rename</button></li>
+          <li><button type="button" onClick={this.showDeleteTagModal}>Delete</button></li>
+        </DropdownMenu>
+
         <span className="item">User : {this.state.curUser}</span>
+
 
         <Popup title="Add Branch" ref="addBranchModal">
           <div className="parameters-col_description">
@@ -470,6 +610,74 @@ export default class SpecMgrMenu extends React.Component {
             <button className="btn modal-btn auth authorize button" onClick={this.merge}>Merge</button>
           </div>
         </Popup>
+
+
+        <Popup title="Add tag" ref="addTagModal">
+          <div className="parameters-col_description">
+            <p>Enter the Tag Infomation to create.</p>
+            <div className="topbar-popup-item">
+              <label>From GitObject (Branch or Tag):</label>
+              <section>
+                <select name="selectedGitObject" onChange={this.handleChange}>
+                  <option key="null" value="null">-- GitObject --</option>
+                  { this.state.gitObjectList && this.state.gitObjectList.map(gitObject => <option key={gitObject} value={gitObject}>{gitObject}</option>) }
+                </select>
+              </section>
+            </div>
+            <div className="topbar-popup-item">
+              <label>Add Tag Name:</label>
+              <section>
+                <input type="text" name="targetTag" onChange={this.handleChange}/>
+              </section>
+            </div>
+          </div>
+          <div className="topbar-popup-button-area">
+            <button className="btn modal-btn auth authorize button" onClick={this.addTag}>Create</button>
+          </div>
+        </Popup>
+
+        <Popup title="Rename Tag" ref="renameTagModal">
+          <div className="parameters-col_description">
+          <p>Enter the Tag Infomation to rename.</p>
+            <div className="topbar-popup-item">
+              <label>From Tag:</label>
+              <section>
+                <select name="selectedTag" onChange={this.handleChange}>
+                  <option key="null" value="null">-- Tag --</option>
+                  { this.state.tagList && this.state.tagList.map(tag => <option key={tag} value={tag}>{tag}</option>) }
+                </select>
+              </section>
+            </div>
+            <div className="topbar-popup-item">
+              <label>To Tag Name:</label>
+              <section>
+                <input type="text" name="targetTag" onChange={this.handleChange}/>
+              </section>
+            </div>
+          </div>
+          <div className="topbar-popup-button-area">
+            <button className="btn modal-btn auth authorize button" onClick={this.renameTag}>Rename</button>
+          </div>
+        </Popup>
+
+        <Popup title="Delete Tag" ref="deleteTagModal">
+          <div className="parameters-col_description">
+            <p>Select the Tag to delete.</p>
+            <div className="topbar-popup-item">
+              <label>Tag:</label>
+              <section>
+                <select name="selectedTag" onChange={this.handleChange}>
+                  <option key="null" value="null">-- Tag --</option>
+                  { this.state.tagList && this.state.tagList.map(tag => <option key={tag} value={tag}>{tag}</option>) }
+                </select>
+              </section>
+            </div>
+          </div>
+          <div className="topbar-popup-button-area">
+            <button className="btn modal-btn auth authorize button" onClick={this.deleteTag}>Delete</button>
+          </div>
+        </Popup>
+
 
         <NotificationSystem ref="notificationSystem" allowHTML={true} />
       </div>
