@@ -8,6 +8,8 @@ import YAML from "js-yaml"
 import beautifyJson from "json-beautify"
 import NotificationSystem from 'react-notification-system';
 
+import SpecMgrMenu from './SpecMgrMenu'
+
 import "react-dd-menu/dist/react-dd-menu.css"
 import "./topbar.less"
 import Logo from "./logo_small.png"
@@ -40,8 +42,6 @@ export default class Topbar extends React.Component {
       clients: [],
       servers: [],
       curSpecMgr: "http://localhost:8081/v1",
-      curUser: "spec-mgr",
-      curBranch: "master",
       curSpecId: null,
       specIdList: [],
       selectedSpecId: null
@@ -54,7 +54,9 @@ export default class Topbar extends React.Component {
   handleChange = (event) => {
     this.setState({[event.target.name]: event.target.value})
   }
-
+  updateState = (state) => {
+    this.setState(state);
+  }
 
   // Menu actions
 
@@ -208,6 +210,7 @@ export default class Topbar extends React.Component {
           this.props.specActions.updateSpec(
             YAML.safeDump(YAML.safeLoad(text))
           )
+          this.setState({["curSpecId"]: null})
           this.hideImportUrlModal()
         })
     }
@@ -220,6 +223,8 @@ export default class Topbar extends React.Component {
     fileReader.onload = fileLoadedEvent => {
       let textFromFileLoaded = fileLoadedEvent.target.result
       this.props.specActions.updateSpec(YAML.safeDump(YAML.safeLoad(textFromFileLoaded)))
+
+      this.setState({["curSpecId"]: null})
       this.hideImportFileModal()
     }
 
@@ -421,21 +426,22 @@ export default class Topbar extends React.Component {
                   .map(cli => <li><button type="button" onClick={this.downloadGeneratedFile.bind(null, "client", cli)}>{cli}</button></li>) }
             </DropdownMenu> : null }
 
-            <div className="topbar-specmgr-info">
-              <span className="item">SpecID : {this.state.curSpecId}</span>
-              <span className="item">Branch : {this.state.curBranch}</span>
-              <span className="item">User : {this.state.curUser}</span>
-            </div>
+            <SpecMgrMenu updateState={this.updateState.bind(this)} >{this.state.curSpecId}</SpecMgrMenu>
           </div>
         </div>
 
         <Popup title="Open" ref="openModal">
           <div className="parameters-col_description">
-            <p>Select the SpecID to open:</p>
-            <select name="selectedSpecId" onChange={this.handleChange}>
-              <option key="null" value="null">-- SpecId --</option>
-              { this.state.specIdList.map(specId => <option key={specId} value={specId}>{specId}</option>) }
-            </select>
+            <p>Select the Spec Information to open.</p>
+            <div className="topbar-popup-item">
+              <label>SpecID:</label>
+              <section>
+                <select name="selectedSpecId" onChange={this.handleChange}>
+                  <option key="null" value="null">-- SpecId --</option>
+                  { this.state.specIdList.map(specId => <option key={specId} value={specId}>{specId}</option>) }
+                </select>
+              </section>
+            </div>
           </div>
           <div className="topbar-popup-button-area">
             <button className="btn modal-btn auth authorize button" onClick={this.open}>Open</button>
@@ -444,11 +450,16 @@ export default class Topbar extends React.Component {
 
         <Popup title="Delete" ref="deleteModal">
           <div className="parameters-col_description">
-            <p>Select the SpecID to delete:</p>
-            <select name="selectedSpecId" onChange={this.handleChange}>
-              <option key="null" value="null">-- SpecId --</option>
-              { this.state.specIdList.map(specId => <option key={specId} value={specId}>{specId}</option>) }
-            </select>
+            <p>Select the Spec Information to delete.</p>
+            <div className="topbar-popup-item">
+              <label>SpecID:</label>
+              <section>
+                <select name="selectedSpecId" onChange={this.handleChange}>
+                  <option key="null" value="null">-- SpecId --</option>
+                  { this.state.specIdList.map(specId => <option key={specId} value={specId}>{specId}</option>) }
+                </select>
+              </section>
+            </div>
           </div>
           <div className="topbar-popup-button-area">
             <button className="btn modal-btn auth authorize button" onClick={this.delete}>Delete</button>
@@ -457,8 +468,13 @@ export default class Topbar extends React.Component {
 
         <Popup title="Save as" ref="saveNewModal">
           <div className="parameters-col_description">
-            <p>Enter the SpecID to create:</p>
-            <input type="text" name="curSpecId" onChange={this.handleChange}/>
+            <p>Select the Spec Information to create.</p>
+            <div className="topbar-popup-item">
+              <label>SpecID:</label>
+              <section>
+                <input type="text" name="curSpecId" onChange={this.handleChange}/>
+              </section>
+            </div>
           </div>
           <div className="topbar-popup-button-area">
             <button className="btn modal-btn auth authorize button" onClick={this.saveNew}>Create</button>
@@ -467,8 +483,13 @@ export default class Topbar extends React.Component {
 
         <Popup title="Import URL" ref="importUrlModal">
           <div className="parameters-col_description">
-            <p>Enter the URL to import from:</p>
-            <input ref="urlLoadInput" type="text"/>
+            <p>Enter the URL to import.</p>
+            <div className="topbar-popup-item">
+              <label>URL:</label>
+              <section>
+                <input ref="urlLoadInput" type="text"/>
+              </section>
+            </div>
           </div>
           <div className="topbar-popup-button-area">
             <button className="btn modal-btn auth authorize button" onClick={this.importFromURL}>Import</button>
@@ -477,8 +498,13 @@ export default class Topbar extends React.Component {
 
         <Popup title="Upload file" ref="importFileModal">
           <div className="parameters-col_description">
-            <p>Choose the File to import from:</p>
-            <input ref="fileLoadInput" type="file"/>
+            <p>Choose the File to import.</p>
+            <div className="topbar-popup-item">
+              <label>File:</label>
+              <section>
+                <input ref="fileLoadInput" type="file"/>
+              </section>
+            </div>
           </div>
           <div className="topbar-popup-button-area">
             <button className="btn modal-btn auth authorize button" onClick={this.importFromFile}>Import</button>
