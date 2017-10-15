@@ -41,14 +41,13 @@ export default class Topbar extends React.Component {
       swaggerClient: null,
       clients: [],
       servers: [],
-      curSpecMgr: "http://localhost:8081/v1",
       curSpecId: null,
       specIdList: [],
-      selectedSpecId: null
+      selectedSpecId: null,
+      isProcessing: false
     }
 
     this.handleChange = this.handleChange.bind(this)
-    this.syncSpecIdlist()
   }
 
   handleChange = (event) => {
@@ -68,8 +67,14 @@ export default class Topbar extends React.Component {
     }
 
     let errorTitle = "failed to open Spec"
-    let url = this.state.curSpecMgr + "/specs/" + targetSpecId
-    fetch(url).then(res => {
+    let url = this.refs.specMgrMenu.state.curSpecMgr + "/specs/" + targetSpecId
+    let headers = this.refs.specMgrMenu.getRequestHeaders('application/x-yaml')
+    this.setState({["isProcessing"]: true})
+    fetch(url, {
+      method: 'GET',
+      headers: headers
+    }).then(res => {
+      this.setState({["isProcessing"]: false})
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, targetSpecId, text)
@@ -86,8 +91,12 @@ export default class Topbar extends React.Component {
 
   syncSpecIdlist = () => {
     let errorTitle = "failed to get Spec list"
-    let url = this.state.curSpecMgr + "/specs"
-    fetch(url).then(res => {
+    let url = this.refs.specMgrMenu.state.curSpecMgr + "/specs"
+    let headers = this.refs.specMgrMenu.getRequestHeaders(null)
+    fetch(url, {
+      method: 'GET',
+      headers: headers
+    }).then(res => {
       res.json().then(json => this.setState({["specIdList"]: json.payload.idList}))
     })
     .catch(error => this.noticeError(errorTitle, error))
@@ -95,7 +104,7 @@ export default class Topbar extends React.Component {
 
   delete = () => {
     let targetSpecId = this.state.selectedSpecId
-    let url = this.state.curSpecMgr + "/specs/" + targetSpecId
+    let url = this.refs.specMgrMenu.state.curSpecMgr + "/specs/" + targetSpecId
 
     if(!targetSpecId) {
       this.noticeError("SpecID is not selected")
@@ -103,13 +112,13 @@ export default class Topbar extends React.Component {
     }
 
     let errorTitle = "failed to delete Spec"
+    let headers = this.refs.specMgrMenu.getRequestHeaders('application/x-yaml')
+    this.setState({["isProcessing"]: true})
     fetch(url, {
       method: 'DELETE',
-      headers: {
-        'Accept': 'application/x-yaml',
-        'Content-Type': 'application/x-yaml',
-      }
+      headers: headers
     }).then(res => {
+      this.setState({["isProcessing"]: false})
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, targetSpecId, text)
@@ -132,20 +141,20 @@ export default class Topbar extends React.Component {
       return
     }
 
-    let url = this.state.curSpecMgr + "/specs/" + targetSpecId
+    let url = this.refs.specMgrMenu.state.curSpecMgr + "/specs/" + targetSpecId
     let editorContent = this.props.specSelectors.specStr()
     let jsContent = YAML.safeLoad(editorContent)
     let yamlContent = YAML.safeDump(jsContent)
 
     let errorTitle = "failed to create Spec"
+    let headers = this.refs.specMgrMenu.getRequestHeaders('application/x-yaml')
+    this.setState({["isProcessing"]: true})
     fetch(url, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/x-yaml',
-        'Content-Type': 'application/x-yaml',
-      },
+      headers: headers,
       body: yamlContent
     }).then(res => {
+      this.setState({["isProcessing"]: false})
       res.text().then(text => {
         if (!res.ok) {
           this.setState({["curSpecId"]: null})
@@ -170,20 +179,20 @@ export default class Topbar extends React.Component {
       return
     }
 
-    let url = this.state.curSpecMgr + "/specs/" + targetSpecId
+    let url = this.refs.specMgrMenu.state.curSpecMgr + "/specs/" + targetSpecId
     let editorContent = this.props.specSelectors.specStr()
     let jsContent = YAML.safeLoad(editorContent)
     let yamlContent = YAML.safeDump(jsContent)
 
     let errorTitle = "failed to save Spec"
+    let headers = this.refs.specMgrMenu.getRequestHeaders('application/x-yaml')
+    this.setState({["isProcessing"]: true})
     fetch(url, {
       method: 'PUT',
-      headers: {
-        'Accept': 'application/x-yaml',
-        'Content-Type': 'application/x-yaml',
-      },
+      headers: headers,
       body: yamlContent
     }).then(res => {
+      this.setState({["isProcessing"]: false})
       res.text().then(text => {
         if (!res.ok) {
           this.setState({["curSpecId"]: null})
@@ -204,9 +213,11 @@ export default class Topbar extends React.Component {
     let url = this.refs.urlLoadInput.value
 
     if(url) {
+      this.setState({["isProcessing"]: true})
       fetch(url)
         .then(res => res.text())
         .then(text => {
+          this.setState({["isProcessing"]: false})
           this.props.specActions.updateSpec(
             YAML.safeDump(YAML.safeLoad(text))
           )
@@ -426,7 +437,7 @@ export default class Topbar extends React.Component {
                   .map(cli => <li><button type="button" onClick={this.downloadGeneratedFile.bind(null, "client", cli)}>{cli}</button></li>) }
             </DropdownMenu> : null }
 
-            <SpecMgrMenu updateState={this.updateState.bind(this)} >{this.state.curSpecId}</SpecMgrMenu>
+            <SpecMgrMenu ref="specMgrMenu" updateState={this.updateState.bind(this)} >{this.state.curSpecId}</SpecMgrMenu>
           </div>
         </div>
 
@@ -444,7 +455,7 @@ export default class Topbar extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn modal-btn auth authorize button" onClick={this.open}>Open</button>
+            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.open}>Open</button>
           </div>
         </Popup>
 
@@ -462,7 +473,7 @@ export default class Topbar extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn modal-btn auth authorize button" onClick={this.delete}>Delete</button>
+            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.delete}>Delete</button>
           </div>
         </Popup>
 
@@ -477,7 +488,7 @@ export default class Topbar extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn modal-btn auth authorize button" onClick={this.saveNew}>Create</button>
+            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.saveNew}>Create</button>
           </div>
         </Popup>
 
@@ -492,7 +503,7 @@ export default class Topbar extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn modal-btn auth authorize button" onClick={this.importFromURL}>Import</button>
+            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.importFromURL}>Import</button>
           </div>
         </Popup>
 
@@ -507,7 +518,7 @@ export default class Topbar extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn modal-btn auth authorize button" onClick={this.importFromFile}>Import</button>
+            <button className="btn authorize" onClick={this.importFromFile}>Import</button>
           </div>
         </Popup>
 
