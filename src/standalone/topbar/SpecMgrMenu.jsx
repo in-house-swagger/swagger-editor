@@ -8,12 +8,10 @@ export default class SpecMgrMenu extends React.Component {
   constructor(props, context) {
     super(props, context)
 
-    // TODO spec-mgr に 指定userでのカレントbranchを返すAPIが必要
-    // TODO syncCurBranch を用意して、ブランチ操作後に必ず実施させる。master | null を当てているところ。
     this.state = {
       curSpecMgr: "http://localhost:8081/v1",
-      curUser: this.getCurUser().id,
-      curBranch: "master",
+      curUser: "loading...",
+      curBranch: "loading...",
       curMessage: this.getCommitMessage(),
 
       userList: null,
@@ -29,19 +27,53 @@ export default class SpecMgrMenu extends React.Component {
 
       targetUser: null,
       targetEmail: null,
+      targetMessage: null,
       targetBranch: null,
       targetTag: null,
 
+      defaultUser: null,
+      defaultMessage: null,
       isProcessing: false
     }
 
     this.handleChange = this.handleChange.bind(this)
+    this.syncDefault()
     this.syncUserlist()
     this.syncGitObjectLists()
+    this.restoreCurUser()
   }
 
   handleChange = (event) => {
     this.setState({[event.target.name]: event.target.value})
+  }
+
+  requestStart = () => {
+    this.setState({["isProcessing"]: true})
+  }
+  requestEnd = () => {
+    this.setState({["isProcessing"]: false})
+  }
+  isRequestProcessing = () => {
+    return this.state.isProcessing
+  }
+
+
+  syncDefault = () => {
+    let errorTitle = "failed to get Default User"
+    let url = this.state.curSpecMgr + "/env"
+    fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    }).then(res => {
+      res.json().then(json => {
+        this.state.defaultUser = json.systemEnvironment.SCM_DEFAULT_USER
+        this.state.defaultMessage = json.systemEnvironment.SCM_DEFAULT_COMMIT_MESSAGE
+      })
+    })
+    .catch(error => this.noticeError(errorTitle, error))
   }
 
   syncUserlist = () => {
@@ -57,6 +89,8 @@ export default class SpecMgrMenu extends React.Component {
     }).then(res => {
       res.json().then(json => {
         this.setState({["userList"]: json.payload.idList})
+        // 一覧に現在ユーザが存在しない場合、デフォルトユーザを設定
+        if (this.state.userList.indexOf(this.state.curUser) < 0) this.applyDefaultUser()
       })
     })
     .catch(error => this.noticeError(errorTitle, error))
@@ -71,9 +105,13 @@ export default class SpecMgrMenu extends React.Component {
       headers: headers
     }).then(res => {
       res.json().then(json => {
+        if (this.state.curBranch != json.payload.current) {
+          this.setState({["curBranch"]: json.payload.current})
+          // ブランチが切り替わった場合、編集中のspecをクリア
+          this.props.updateState({["curSpecId"]: null})
+        }
         this.setState({["branchList"]: json.payload.idList})
-
-        this.setState({["gitObjectList"]: this.state.branchList})
+        // 続いけてtag一覧を更新
         this.syncTaglist()
       })
     })
@@ -111,59 +149,57 @@ export default class SpecMgrMenu extends React.Component {
   canUseUserManagement = () => {
     if(!window.localStorage) {
       noticeError('this browser is not support user-management.')
+      this.state.curUser = "DEFAULT"
       return false
     }
     return true
+  }
+
+  applyDefaultUser = () => {
+    this.saveCurUser(this.state.defaultUser)
   }
 
   saveCurUser = (id) => {
     if (! this.canUseUserManagement()) return
 
-    if (!id) {
-      this.noticeError('id is Empty.')
-      return false
-    }
-
     let data = { id: id }
     window.localStorage.setItem(this.userManagementKey(), JSON.stringify(data))
-    return true
+
+    // ユーザ切替時
+    if (this.state.curUser && this.state.curUser != id) {
+      this.syncGitObjectLists()
+    }
+    // construct時はsetStateが利用できないので、直接stateプロパティを更新
+    this.state.curUser = id
+    this.setState({["curUser"]: id})
   }
 
   getCurUser = () => {
-    if (! this.canUseUserManagement()) return this.getDefaultUser()
+    if (! this.canUseUserManagement()) return
 
     let text = window.localStorage.getItem(this.userManagementKey());
-    if (!text || text == "") {
-      let defaultUser = this.getDefaultUser()
-      this.saveCurUser(defaultUser.id)
-      return defaultUser
-    }
-
+    if (!text || text == "") { return { id: null} }
     return JSON.parse(text)
   }
 
-  // TODO spec-mgr にデフォルトユーザ情報を返すAPIが必要（id）
-  getDefaultUser = () => {
-    return { id: 'spec-mgr' }
+  restoreCurUser = () => {
+    if (! this.canUseUserManagement()) return
+
+    let curUser = this.getCurUser()
+    if (!curUser.id || curUser.id == "") {
+      this.applyDefaultUser()
+      return
+    }
+    this.saveCurUser(curUser.id)
   }
 
   deleteCurUser = () => {
     if (! this.canUseUserManagement()) return
 
     window.localStorage.removeItem(this.userManagementKey())
+    this.setState({["curUser"]: null})
   }
 
-  updateCurUser = (id) => {
-    if (! this.canUseUserManagement()) return
-
-    let data = this.getCurUser()
-    if (id) {
-      data.id = id
-    }
-
-    this.deleteCurUser()
-    this.saveCurUser(data.id)
-  }
 
   getRequestHeaders = (mimeType) => {
     let user = this.getCurUser()
@@ -190,11 +226,19 @@ export default class SpecMgrMenu extends React.Component {
   addUser = () => {
     let id = this.state.targetUser
     let email = this.state.targetEmail
-    if (! this.saveCurUser(id)) return
+    if (!id) {
+      this.noticeError('id is Empty.')
+      return
+    }
+
+    if (!email) {
+      this.noticeError('email is Empty.')
+      return
+    }
 
     let errorTitle = "failed to create User"
     let url = this.state.curSpecMgr + "/users/" + id + "?email=" + email
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'POST',
       headers: {
@@ -202,23 +246,18 @@ export default class SpecMgrMenu extends React.Component {
         'Content-Type': 'application/json'
       }
     }).then(res => {
-      this.setState({["isProcessing"]: false})
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, id, text)
           return
         }
-
-        // propsに設定された、親のstate更新メソッドで、curSpecIdのクリアを通知
-        this.props.updateState({["curSpecId"]: null})
-        this.setState({["curBranch"]: "master"})
-        this.setState({["curUser"]: id})
-        this.hideAddUserModal()
-
         this.noticeSuccess(id + " User has been created.")
+        this.requestEnd()
       })
     })
     .catch(error => this.noticeError(errorTitle, error))
+
+    this.hideAddUserModal()
   }
 
   //------------------------------------------------------------------------------------------------
@@ -240,7 +279,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to delete User"
     let url = this.state.curSpecMgr + "/users/" + id
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'DELETE',
       headers: {
@@ -248,20 +287,16 @@ export default class SpecMgrMenu extends React.Component {
         'Content-Type': 'application/json'
       }
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, to, text)
           return
         }
 
-        // propsに設定された、親のstate更新メソッドで、curSpecIdのクリアを通知
         if (id == this.state.curUser) {
-          this.deleteCurUser()
-          let defaultUser = this.getCurUser()
-          this.props.updateState({["curSpecId"]: null})
-          this.setState({["curBranch"]: null})
-          this.setState({["curUser"]: defaultUser.id})
+          this.syncGitObjectLists()
+          this.applyDefaultUser()
         }
         this.noticeSuccess(id + " User has been deleted.")
       })
@@ -289,10 +324,7 @@ export default class SpecMgrMenu extends React.Component {
     }
 
     if (id != this.state.curUser) {
-      this.updateCurUser(id, null)
-      this.props.updateState({["curSpecId"]: null})
-      this.setState({["curBranch"]: null})
-      this.setState({["curUser"]: id})
+      this.saveCurUser(id)
     }
 
     this.hideChangeUserModal()
@@ -308,16 +340,23 @@ export default class SpecMgrMenu extends React.Component {
   getCommitMessage = () => {
     return window.localStorage.getItem(this.getCommitMessageKey())
   }
-  saveCommitMessage = (message) => {
-    window.localStorage.setItem(this.getCommitMessageKey(), message)
+  saveCommitMessage = () => {
+    if (this.state.targetMessage) {
+      window.localStorage.setItem(this.getCommitMessageKey(), this.state.targetMessage)
+      this.state.curMessage = this.state.targetMessage
+    }
+    this.hideChangeCommitMessageModal()
   }
 
   //------------------------------------------------------------------------------------------------
   // change message
   //------------------------------------------------------------------------------------------------
-  showChangeCommitMessageModal = () => { this.refs.changeCommitMessageModal.show() }
+  showChangeCommitMessageModal = () => {
+    if (this.state.curMessage) this.state.curMessage = this.state.defaultMessage
+    this.state.targetMessage = null
+    this.refs.changeCommitMessageModal.show()
+  }
   hideChangeCommitMessageModal = () => {
-    this.saveCommitMessage(this.state.curMessage)
     this.refs.changeCommitMessageModal.hide()
   }
 
@@ -351,21 +390,19 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to create Branch"
     let url = this.state.curSpecMgr + "/branches/" + to + "?object=" + from
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'POST',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, to, text)
           return
         }
 
-        // propsに設定された、親のstate更新メソッドで、curSpecIdのクリアを通知
-        this.props.updateState({["curSpecId"]: null})
-        this.setState({["curBranch"]: to})
+        this.syncGitObjectLists()
         this.hideAddBranchModal()
 
         this.noticeSuccess(to + " Branch has been created.")
@@ -400,21 +437,19 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to rename Branch"
     let url = this.state.curSpecMgr + "/branches/" + from + "?to=" + to
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'PUT',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, to, text)
           return
         }
 
-        // propsに設定された、親のstate更新メソッドで、curSpecIdのクリアを通知
-        this.props.updateState({["curSpecId"]: null})
-        this.setState({["curBranch"]: to})
+        this.syncGitObjectLists()
         this.hideRenameBranchModal()
 
         this.noticeSuccess(to + " Branch has been renamed.")
@@ -443,22 +478,20 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to delete Branch"
     let url = this.state.curSpecMgr + "/branches/" + targetBranch
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'DELETE',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, targetBranch, text)
           return
         }
 
-        // 自ブランチを削除した場合、masterにswitchされる
         if (this.state.curBranch == targetBranch) {
-          this.props.updateState({["curSpecId"]: null})
-          this.setState({["curBranch"]: "master"})
+          this.syncGitObjectLists()
         }
         this.noticeSuccess(targetBranch + " Branch has been deleted.")
       })
@@ -488,12 +521,12 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to switch Branch"
     let url = this.state.curSpecMgr + "/switch/" + targetBranch
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'POST',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, targetBranch, text)
@@ -501,8 +534,7 @@ export default class SpecMgrMenu extends React.Component {
         }
 
         // propsに設定された、親のstate更新メソッドで、curSpecIdのクリアを通知
-        this.props.updateState({["curSpecId"]: null})
-        this.setState({["curBranch"]: targetBranch})
+        this.syncGitObjectLists()
         this.hideSwitchModal()
       })
     })
@@ -535,21 +567,19 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to merge"
     let url = this.state.curSpecMgr + "/merges?source=" + from + "&target=" + to
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'POST',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, to, text)
           return
         }
 
-        // propsに設定された、親のstate更新メソッドで、curSpecIdのクリアを通知
-        this.props.updateState({["curSpecId"]: null})
-        this.setState({["curBranch"]: to})
+        this.syncGitObjectLists()
         this.hideMergeModal()
 
         this.noticeSuccess(from + " has been merge into " + to + ".")
@@ -588,12 +618,12 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to create Tag"
     let url = this.state.curSpecMgr + "/tags/" + to + "?object=" + from
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'POST',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, to, text)
@@ -633,12 +663,12 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to rename Tag"
     let url = this.state.curSpecMgr + "/tags/" + from + "?to=" + to
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'PUT',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, to, text)
@@ -672,12 +702,12 @@ export default class SpecMgrMenu extends React.Component {
     let errorTitle = "failed to delete Tag"
     let url = this.state.curSpecMgr + "/tags/" + targetTag
     let headers = this.getRequestHeaders(null)
-    this.setState({["isProcessing"]: true})
+    this.requestStart()
     fetch(url, {
       method: 'DELETE',
       headers: headers
     }).then(res => {
-      this.setState({["isProcessing"]: false})
+      this.requestEnd()
       res.text().then(text => {
         if (!res.ok) {
           this.handleSpecMgrError(errorTitle, targetTag, text)
@@ -695,12 +725,12 @@ export default class SpecMgrMenu extends React.Component {
   //------------------------------------------------------------------------------------------------
   // notification
   //------------------------------------------------------------------------------------------------
-  handleSpecMgrError = (errorTitle, specId, text) => {
+  handleSpecMgrError = (errorTitle, id, text) => {
     let json = JSON.parse(text)
     if (json) {
-      this.noticeListError(errorTitle + ": " + specId, json._errors.list)
+      this.noticeListError(errorTitle + ": " + id, json._errors.list)
     } else {
-      this.noticeError(errorTitle + ": " + specId, text)
+      this.noticeError(errorTitle + ": " + id, text)
     }
   }
   noticeListError = (title, errorList) => {
@@ -738,7 +768,7 @@ export default class SpecMgrMenu extends React.Component {
 
     return (
       <div className="topbar-specmgr-info">
-        <span className="item">SpecID : {this.props.children}</span>
+        <span className="item item-title">SpecID : {this.props.children}</span>
 
         <DropdownMenu className="item" {...makeMenuOptions("Branch : " + this.state.curBranch)}>
           <li><button type="button" onClick={this.showAddBranchModal}>Add Branch</button></li>
@@ -782,7 +812,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.addUser}>Create</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.addUser}>Create</button>
           </div>
         </Popup>
 
@@ -800,7 +830,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.deleteUser}>Delete</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.deleteUser}>Delete</button>
           </div>
         </Popup>
 
@@ -818,23 +848,23 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.changeUser}>Change</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.changeUser}>Change</button>
           </div>
         </Popup>
 
 
-        <Popup title="Commit Message" ref="changeCommitMessageModal">
+        <Popup title="Change Commit Message" ref="changeCommitMessageModal">
           <div className="parameters-col_description">
             <p>Enter the Commit Message to Save Specification.</p>
             <div className="topbar-popup-item">
               <label>message:</label>
               <section>
-                <input type="text" name="curMessage" onChange={this.handleChange} placeholder={this.state.curMessage} />
+                <input type="text" name="targetMessage" onChange={this.handleChange} placeholder={this.state.curMessage} />
               </section>
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.hideChangeCommitMessageModal}>Close</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.saveCommitMessage}>Save</button>
           </div>
         </Popup>
 
@@ -859,7 +889,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.addBranch}>Create</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.addBranch}>Create</button>
           </div>
         </Popup>
 
@@ -883,7 +913,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.renameBranch}>Rename</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.renameBranch}>Rename</button>
           </div>
         </Popup>
 
@@ -901,7 +931,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.deleteBranch}>Delete</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.deleteBranch}>Delete</button>
           </div>
         </Popup>
 
@@ -919,7 +949,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.switchBranch}>Switch</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.switchBranch}>Switch</button>
           </div>
         </Popup>
 
@@ -946,7 +976,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.merge}>Merge</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.merge}>Merge</button>
           </div>
         </Popup>
 
@@ -971,7 +1001,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.addTag}>Create</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.addTag}>Create</button>
           </div>
         </Popup>
 
@@ -995,7 +1025,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.renameTag}>Rename</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.renameTag}>Rename</button>
           </div>
         </Popup>
 
@@ -1013,7 +1043,7 @@ export default class SpecMgrMenu extends React.Component {
             </div>
           </div>
           <div className="topbar-popup-button-area">
-            <button className="btn authorize" disabled={this.state.isProcessing} onClick={this.deleteTag}>Delete</button>
+            <button className="btn authorize" disabled={this.isRequestProcessing()} onClick={this.deleteTag}>Delete</button>
           </div>
         </Popup>
 
