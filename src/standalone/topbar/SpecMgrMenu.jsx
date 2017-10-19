@@ -5,13 +5,15 @@ import Popup from "./Popup"
 import NotificationSystem from 'react-notification-system';
 
 export default class SpecMgrMenu extends React.Component {
+  static DEFAULT_VALUE = 'loading...'
+
   constructor(props, context) {
     super(props, context)
 
     this.state = {
       curSpecMgr: "http://localhost:8081/v1",
-      curUser: "loading...",
-      curBranch: "loading...",
+      curUser: SpecMgrMenu.DEFAULT_VALUE,
+      curBranch: SpecMgrMenu.DEFAULT_VALUE,
       curMessage: this.getCommitMessage(),
 
       userList: null,
@@ -38,9 +40,6 @@ export default class SpecMgrMenu extends React.Component {
 
     this.handleChange = this.handleChange.bind(this)
     this.syncDefault()
-    this.syncUserlist()
-    this.syncGitObjectLists()
-    this.restoreCurUser()
   }
 
   handleChange = (event) => {
@@ -71,6 +70,11 @@ export default class SpecMgrMenu extends React.Component {
       res.json().then(json => {
         this.state.defaultUser = json.systemEnvironment.SCM_DEFAULT_USER
         this.state.defaultMessage = json.systemEnvironment.SCM_DEFAULT_COMMIT_MESSAGE
+
+        // デフォルト値の設定後に、状態を同期
+        this.syncUserlist()
+        this.syncGitObjectLists()
+        this.restoreCurUser()
       })
     })
     .catch(error => this.noticeError(errorTitle, error))
@@ -79,13 +83,9 @@ export default class SpecMgrMenu extends React.Component {
   syncUserlist = () => {
     let errorTitle = "failed to get User list"
     let url = this.state.curSpecMgr + "/users"
-    let headers = this.getRequestHeaders(null)
     fetch(url, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
     }).then(res => {
       res.json().then(json => {
         this.setState({["userList"]: json.payload.idList})
@@ -99,7 +99,7 @@ export default class SpecMgrMenu extends React.Component {
   syncGitObjectLists = () => {
     let errorTitle = "failed to get Branch list"
     let url = this.state.curSpecMgr + "/branches"
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     fetch(url, {
       method: 'GET',
       headers: headers
@@ -121,14 +121,19 @@ export default class SpecMgrMenu extends React.Component {
   syncTaglist = () => {
     let errorTitle = "failed to get Tag list"
     let url = this.state.curSpecMgr + "/tags"
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     fetch(url, {
       method: 'GET',
       headers: headers
     }).then(res => {
+      if (res.status == 204) {
+        this.setState({["tagList"]: []})
+        this.setState({["gitObjectList"]: this.state.branchList})
+        return
+      }
+
       res.json().then(json => {
         this.setState({["tagList"]: json.payload.idList})
-
         let tmpList = []
         tmpList = tmpList.concat(this.state.branchList)
         tmpList = tmpList.concat(this.state.tagList)
@@ -166,7 +171,7 @@ export default class SpecMgrMenu extends React.Component {
     window.localStorage.setItem(this.userManagementKey(), JSON.stringify(data))
 
     // ユーザ切替時
-    if (this.state.curUser && this.state.curUser != id) {
+    if (this.state.curUser != SpecMgrMenu.DEFAULT_VALUE && this.state.curUser != id) {
       this.syncGitObjectLists()
     }
     // construct時はsetStateが利用できないので、直接stateプロパティを更新
@@ -178,7 +183,7 @@ export default class SpecMgrMenu extends React.Component {
     if (! this.canUseUserManagement()) return
 
     let text = window.localStorage.getItem(this.userManagementKey());
-    if (!text || text == "") { return { id: null} }
+    if (!text || text == "") return null
     return JSON.parse(text)
   }
 
@@ -186,7 +191,7 @@ export default class SpecMgrMenu extends React.Component {
     if (! this.canUseUserManagement()) return
 
     let curUser = this.getCurUser()
-    if (!curUser.id || curUser.id == "") {
+    if (!curUser) {
       this.applyDefaultUser()
       return
     }
@@ -202,15 +207,20 @@ export default class SpecMgrMenu extends React.Component {
 
 
   getRequestHeaders = (mimeType) => {
-    let user = this.getCurUser()
     if (!mimeType) mimeType = "application/json"
-    let data = {
+    let header = {
       'Accept': mimeType,
-      'Content-Type': mimeType,
-      'X-Commit-User': window.encodeURIComponent(user.id),
-      'X-Commit-Message': window.encodeURIComponent(this.state.curMessage)
+      'Content-Type': mimeType
     }
-    return data
+
+    let user = this.getCurUser()
+    if (user)
+      header['X-Commit-User'] = window.encodeURIComponent(user.id)
+
+    if (this.state.curMessage)
+      header['X-Commit-Message'] = window.encodeURIComponent(this.state.curMessage)
+
+    return header
   }
 
   //------------------------------------------------------------------------------------------------
@@ -389,7 +399,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to create Branch"
     let url = this.state.curSpecMgr + "/branches/" + to + "?object=" + from
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'POST',
@@ -436,7 +446,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to rename Branch"
     let url = this.state.curSpecMgr + "/branches/" + from + "?to=" + to
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'PUT',
@@ -477,7 +487,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to delete Branch"
     let url = this.state.curSpecMgr + "/branches/" + targetBranch
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'DELETE',
@@ -520,7 +530,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to switch Branch"
     let url = this.state.curSpecMgr + "/switch/" + targetBranch
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'POST',
@@ -566,7 +576,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to merge"
     let url = this.state.curSpecMgr + "/merges?source=" + from + "&target=" + to
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'POST',
@@ -617,7 +627,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to create Tag"
     let url = this.state.curSpecMgr + "/tags/" + to + "?object=" + from
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'POST',
@@ -662,7 +672,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to rename Tag"
     let url = this.state.curSpecMgr + "/tags/" + from + "?to=" + to
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'PUT',
@@ -701,7 +711,7 @@ export default class SpecMgrMenu extends React.Component {
 
     let errorTitle = "failed to delete Tag"
     let url = this.state.curSpecMgr + "/tags/" + targetTag
-    let headers = this.getRequestHeaders(null)
+    let headers = this.getRequestHeaders()
     this.requestStart()
     fetch(url, {
       method: 'DELETE',
