@@ -10,8 +10,11 @@ export default class SpecMgrMenu extends React.Component {
   constructor(props, context) {
     super(props, context)
 
+    let defaultSpecMgrHostname = window.location.hostname
+    let defaultSpecMgrPort = eval(window.location.port) + 1
+
     this.state = {
-      curSpecMgr: "http://localhost:8081/v1",
+      curSpecMgr: "http://" + defaultSpecMgrHostname + ":" + defaultSpecMgrPort,
       curUser: SpecMgrMenu.DEFAULT_VALUE,
       curBranch: SpecMgrMenu.DEFAULT_VALUE,
       curMessage: this.getCommitMessage(),
