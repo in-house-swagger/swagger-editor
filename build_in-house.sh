@@ -13,7 +13,7 @@ readonly DIR_BASE="$(pwd)"
 readonly DIR_DIST="${DIR_BASE}/dist"
 readonly DIR_ARCHIVE_DIST="${DIR_BASE}/dist_archive"
 
-readonly PRODUCT="local-swagger-editor"
+readonly PRODUCT="in-house-swagger-editor"
 readonly VERSION=$(                                                                                \
   cat package.json                                                                                 |
   grep '  "version":'                                                                              |
