@@ -1,6 +1,7 @@
 import React, { PropTypes } from "react"
 import Swagger from "swagger-client"
 import "whatwg-fetch"
+import CodegenOptionPopup from "./CodegenOptionPopup"
 import DropdownMenu from "./DropdownMenu"
 import Popup from "./Popup"
 import downloadFile from "react-file-download"
@@ -19,6 +20,8 @@ export default class Topbar extends React.Component {
     super(props, context)
 
     let url = "http://" + window.location.host
+// for npm run dev
+//     let url = "http://localhost:8080"
     Swagger(url + "/api/swagger.json", {
       requestInterceptor: (req) => {
         req.headers["Accept"] = "application/json"
@@ -276,7 +279,7 @@ export default class Topbar extends React.Component {
     this.props.specActions.updateSpec(yamlContent)
   }
 
-  downloadGeneratedFile = (type, name) => {
+  downloadGeneratedFile = (type, name, options) => {
     let { specSelectors } = this.props
     let swaggerClient = this.state.swaggerClient
     if(!swaggerClient) {
@@ -287,6 +290,7 @@ export default class Topbar extends React.Component {
       swaggerClient.apis.servers.generateServerForLanguage({
         framework : name,
         body: JSON.stringify({
+          options: options,
           spec: specSelectors.specJson()
         }),
         headers: JSON.stringify({
@@ -294,20 +298,30 @@ export default class Topbar extends React.Component {
         })
       })
         .then(res => handleResponse(res))
+        .catch(err => {
+          let errorObj = JSON.parse(err.response.text)
+          if (errorObj) this.noticeError('failed to generate', errorObj.message)
+        })
     }
 
     if(type === "client") {
       swaggerClient.apis.clients.generateClient({
         language : name,
         body: JSON.stringify({
+          options: options,
           spec: specSelectors.specJson()
         })
       })
         .then(res => handleResponse(res))
+        .catch(err => {
+          let errorObj = JSON.parse(err.response.text)
+          if (errorObj) this.noticeError('failed to generate', errorObj.message)
+        })
     }
 
     function handleResponse(res) {
       if(!res.ok) {
+        this.props.noticeError(res.message)
         return console.error(res)
       }
 
@@ -352,6 +366,8 @@ export default class Topbar extends React.Component {
 
   showImportFileModal = () => { this.refs.importFileModal.show() }
   hideImportFileModal = () => { this.refs.importFileModal.hide() }
+
+  showGenerateModal = (type, name) => { this.refs.generateModal.show(type, name) }
 
 
   // notification
@@ -433,12 +449,12 @@ export default class Topbar extends React.Component {
 
             { showGenerateMenu ? <DropdownMenu className="long" {...makeMenuOptions("Generate Server")}>
               { this.state.servers
-                  .map(serv => <li><button type="button" onClick={this.downloadGeneratedFile.bind(null, "server", serv)}>{serv}</button></li>) }
+                  .map(serv => <li><button type="button" onClick={this.showGenerateModal.bind(null, "server", serv)}>{serv}</button></li>) }
             </DropdownMenu> : null }
 
             { showGenerateMenu ? <DropdownMenu className="long" {...makeMenuOptions("Generate Client")}>
               { this.state.clients
-                  .map(cli => <li><button type="button" onClick={this.downloadGeneratedFile.bind(null, "client", cli)}>{cli}</button></li>) }
+                  .map(cli => <li><button type="button" onClick={this.showGenerateModal.bind(null, "client", cli)}>{cli}</button></li>) }
             </DropdownMenu> : null }
 
             <SpecMgrMenu ref="specMgrMenu" updateState={this.updateState.bind(this)} >{this.state.curSpecId}</SpecMgrMenu>
@@ -525,6 +541,15 @@ export default class Topbar extends React.Component {
             <button className="btn authorize" onClick={this.importFromFile}>Import</button>
           </div>
         </Popup>
+
+        <CodegenOptionPopup
+          ref="generateModal"
+          updateState={this.updateState.bind(this)}
+          swaggerClient={this.state.swaggerClient}
+          noticeSuccess={this.noticeSuccess}
+          noticeError={this.noticeError}
+          downloadGeneratedFile={this.downloadGeneratedFile}
+          />
 
         <NotificationSystem ref="notificationSystem" allowHTML={true} />
       </div>
