@@ -810,7 +810,7 @@ export default class SpecMgrMenu extends React.Component {
 
         <Popup title="Add User" ref="addUserModal">
           <div className="parameters-col_description">
-            <p>Enter the User Infomation to create.</p>
+            <p>Enter the Commit User Infomation to create.</p>
             <div className="topbar-popup-item">
               <label>id:</label>
               <section>
@@ -831,7 +831,7 @@ export default class SpecMgrMenu extends React.Component {
 
         <Popup title="Delete User" ref="deleteUserModal">
           <div className="parameters-col_description">
-            <p>Select the User to delete.</p>
+            <p>Select the Commit User to delete.</p>
             <div className="topbar-popup-item">
               <label>User:</label>
               <section>
@@ -849,7 +849,7 @@ export default class SpecMgrMenu extends React.Component {
 
         <Popup title="Change User" ref="changeUserModal">
           <div className="parameters-col_description">
-            <p>Select the Branch to open.</p>
+            <p>Select the Commit User to change.</p>
             <div className="topbar-popup-item">
               <label>User:</label>
               <section>
@@ -950,7 +950,7 @@ export default class SpecMgrMenu extends React.Component {
 
         <Popup title="Switch Branch" ref="switchModal">
           <div className="parameters-col_description">
-            <p>Select the Branch to open.</p>
+            <p>Select the Branch to switch.</p>
             <div className="topbar-popup-item">
               <label>Branch:</label>
               <section>
@@ -968,7 +968,7 @@ export default class SpecMgrMenu extends React.Component {
 
         <Popup title="Merge Branch" ref="mergeModal">
           <div className="parameters-col_description">
-          <p>Enter the Branch Infomation to rename.</p>
+          <p>Enter the Branch Infomation to merge.</p>
             <div className="topbar-popup-item">
               <label>From Branch:</label>
               <section>

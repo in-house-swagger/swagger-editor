@@ -463,7 +463,7 @@ export default class Topbar extends React.Component {
 
         <Popup title="Open" ref="openModal">
           <div className="parameters-col_description">
-            <p>Select the Spec Information to open.</p>
+            <p>Select the SpecID to open.</p>
             <div className="topbar-popup-item">
               <label>SpecID:</label>
               <section>
@@ -481,7 +481,7 @@ export default class Topbar extends React.Component {
 
         <Popup title="Delete" ref="deleteModal">
           <div className="parameters-col_description">
-            <p>Select the Spec Information to delete.</p>
+            <p>Select the SpecID to delete.</p>
             <div className="topbar-popup-item">
               <label>SpecID:</label>
               <section>
@@ -499,7 +499,7 @@ export default class Topbar extends React.Component {
 
         <Popup title="Save as" ref="saveNewModal">
           <div className="parameters-col_description">
-            <p>Select the Spec Information to create.</p>
+            <p>Enter the SpecID to create.</p>
             <div className="topbar-popup-item">
               <label>SpecID:</label>
               <section>
