@@ -5,7 +5,7 @@ import { placeMarkerDecorations } from "../editor-helpers/marker-placer"
 import Im, { fromJS } from "immutable"
 import ImPropTypes from "react-immutable-proptypes"
 
-import eq from "lodash/eq"
+import isEqual from "lodash/isEqual"
 import isEmpty from "lodash/isEmpty"
 
 import ace from "brace"
@@ -48,6 +48,9 @@ export default function makeEditor({ editorPluginsToRun }) {
     onLoad = (editor) => {
       let { props, state } = this
       let { AST, specObject } = props
+      
+      // fixes a warning, see https://github.com/ajaxorg/ace/issues/2499
+      editor.$blockScrolling = Infinity
 
       let langTools = ace.acequire("ace/ext/language_tools")
 
@@ -167,7 +170,7 @@ export default function makeEditor({ editorPluginsToRun }) {
 
     componentWillReceiveProps(nextProps) {
       let { state } = this
-      let hasChanged = (k) => !eq(nextProps[k], this.props[k])
+      let hasChanged = (k) => !isEqual(nextProps[k], this.props[k])
       let wasEmptyBefore = (k) => nextProps[k] && (!this.props[k] || isEmpty(this.props[k]))
 
       this.updateErrorAnnotations(nextProps)
