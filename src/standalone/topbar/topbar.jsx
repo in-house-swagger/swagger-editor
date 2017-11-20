@@ -456,12 +456,12 @@ export default class Topbar extends React.Component {
 
             { showGenerateMenu ? <DropdownMenu className="long" {...makeMenuOptions("Generate Server")}>
               { this.state.servers
-                .map((serv, i) => <li key={i}><button type="button" onClick={this.downloadGeneratedFile.bind(null, "server", serv)}>{serv}</button></li>) }
+                .map((serv, i) => <li key={i}><button type="button" onClick={this.showGenerateModal.bind(null, "server", serv)}>{serv}</button></li>) }
             </DropdownMenu> : null }
 
             { showGenerateMenu ? <DropdownMenu className="long" {...makeMenuOptions("Generate Client")}>
               { this.state.clients
-                .map((cli, i) => <li key={i}><button type="button" onClick={this.downloadGeneratedFile.bind(null, "client", cli)}>{cli}</button></li>) }
+                .map((cli, i) => <li key={i}><button type="button" onClick={this.showGenerateModal.bind(null, "client", cli)}>{cli}</button></li>) }
             </DropdownMenu> : null }
 
             <SpecMgrMenu ref="specMgrMenu" updateState={this.updateState.bind(this)} >{this.state.curSpecId}</SpecMgrMenu>
