@@ -1,4 +1,5 @@
-import React, { PropTypes } from "react"
+import React from "react"
+import PropTypes from "prop-types"
 
 export default class EditorLayout extends React.Component {
 
@@ -10,6 +11,10 @@ export default class EditorLayout extends React.Component {
     getComponent: PropTypes.func.isRequired,
     layoutSelectors: PropTypes.object.isRequired,
     layoutActions: PropTypes.object.isRequired
+  }
+
+  onChange = (newYaml) => {
+    this.props.specActions.updateSpec(newYaml)
   }
 
   render() {
@@ -25,7 +30,9 @@ export default class EditorLayout extends React.Component {
       <div>
         <Container className='container'>
           <SplitPaneMode>
-            <EditorContainer/>
+            <EditorContainer
+              onChange={this.onChange}
+              />
             <UIBaseLayout/>
         </SplitPaneMode>
       </Container>
